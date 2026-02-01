@@ -2,17 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { fallbackWords } from "./fallbackWords";
 
-function normalizeToSlides(payload) {
-  const raw = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload?.items)
-        ? payload.items
-        : Array.isArray(payload?.answer)
-          ? payload.answer
-          : [];
+function extractRawArray(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.answer)) return payload.answer;
+  return [];
+}
 
+function normalizeToSlides(payload) {
+  const raw = extractRawArray(payload);
   if (!Array.isArray(raw)) return [];
 
   return raw.map((item, i) => ({
@@ -53,13 +52,33 @@ function buildAskUrlsFromEnv() {
   return Array.from(new Set(parts));
 }
 
+function dedupeByIdOrWord(items) {
+  const map = new Map();
+  for (const it of items) {
+    const key = it?.id ?? it?.word ?? JSON.stringify(it);
+    if (!map.has(key)) map.set(key, it);
+  }
+  return Array.from(map.values());
+}
+
+async function fetchSlidesFromUrl(url) {
+  const res = await fetch(url);
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const raw = extractRawArray(data);
+  if (!raw.length) return null;
+
+  return { url, raw };
+}
+
 export default function App() {
   const didFetchRef = useRef(false);
   const askUrls = buildAskUrlsFromEnv();
 
   const [rawResponse, setRawResponse] = useState(fallbackWords);
   const [source, setSource] = useState("local");
-  const [apiUsed, setApiUsed] = useState("");
+  const [apiUsed, setApiUsed] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const slides = useMemo(() => normalizeToSlides(rawResponse), [rawResponse]);
@@ -69,43 +88,38 @@ export default function App() {
     setActive((prev) => clampIndex(prev, slides.length));
   }, [slides.length]);
 
-  async function tryFetchFrom(url) {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    const normalized = normalizeToSlides(data);
-
-    if (!normalized.length) return null;
-    return data;
-  }
-
   async function fetchSlides() {
     if (!askUrls.length) {
       setSource("local");
-      setApiUsed("");
+      setApiUsed([]);
       setLoading(false);
       return;
     }
 
     try {
-      for (const url of askUrls) {
-        try {
-          const data = await tryFetchFrom(url);
-          if (!data) continue;
+      const results = await Promise.allSettled(
+        askUrls.map((u) => fetchSlidesFromUrl(u))
+      );
 
-          setRawResponse(data);
-          setActive(0);
-          setSource("remote");
-          setApiUsed(url);
-          return;
-        } catch {
-          // noop
-        }
+      const ok = results
+        .filter((r) => r.status === "fulfilled" && r.value)
+        .map((r) => r.value);
+
+      if (!ok.length) {
+        setSource("local");
+        setApiUsed([]);
+        return;
       }
 
+      const mergedRaw = dedupeByIdOrWord(ok.flatMap((x) => x.raw));
+
+      setRawResponse(mergedRaw);
+      setActive(0);
+      setSource("remote");
+      setApiUsed(ok.map((x) => x.url));
+    } catch {
       setSource("local");
-      setApiUsed("");
+      setApiUsed([]);
     } finally {
       setLoading(false);
     }
@@ -133,8 +147,10 @@ export default function App() {
 
       <div style={{ marginTop: 8, marginBottom: 12, opacity: 0.9, fontSize: 14 }}>
         Fonte: <strong>{source === "remote" ? "API" : "Base local"}</strong>
-        {source === "remote" && apiUsed ? (
-          <span style={{ marginLeft: 8, opacity: 0.85 }}>({apiUsed})</span>
+        {source === "remote" && apiUsed.length ? (
+          <span style={{ marginLeft: 8, opacity: 0.85 }}>
+            ({apiUsed.join(" | ")})
+          </span>
         ) : null}
         {loading ? " (carregando...)" : ""}
       </div>
