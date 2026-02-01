@@ -1,0 +1,158 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;  /* centro vertical */
+  align-items: center;      /* centro horizontal */
+  padding: 24px;
+}
+.form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.label {
+  display: grid;
+  gap: 6px;
+}
+
+.textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: inherit;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.muted {
+  opacity: 0.8;
+}
+
+.error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 0, 0, 0.35);
+  background: rgba(255, 0, 0, 0.08);
+  margin-bottom: 12px;
+}
+
+.carousel {
+  border-radius: 16px;
+  width: min(720px, 92vw);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.carouselHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.counter {
+  opacity: 0.9;
+}
+
+.slide {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 16px;
+  min-height: 180px;
+  display: grid;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.block {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.k {
+  opacity: 0.75;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.v {
+  margin: 0;
+  line-height: 1.5;
+  opacity: 0.95;
+}
+
+.empty {
+  opacity: 0.85;
+}
+
+.hint {
+  margin-top: 8px;
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+.dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding-top: 10px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  cursor: pointer;
+}
+
+.dot.active {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.debug {
+  margin-top: 14px;
+  opacity: 0.9;
+}
+
+.warn {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 200, 0, 0.35);
+  background: rgba(255, 200, 0, 0.08);
+  margin-bottom: 12px;
+}
