@@ -2,12 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { fallbackWords } from "./fallbackWords";
 
-// Tudo vem do .env (Vite)
-const askUrl = (import.meta.env.VITE_BFF_ASK_URL || "").trim();
-const DEFAULT_PROMPT = import.meta.env.VITE_BFF_DEFAULT_PROMPT || "arvore";
-
-// opcional: chave do BFF (NÃO é chave da OpenAI)
-const BFF_API_KEY = import.meta.env.VITE_BFF_API_KEY || "";
+const DEFAULT_ASK_URL = "https://fiap-bff-trabalho-9aojr.onrender.com/ask";
+const DEFAULT_PROMPT = "arvore"; // mude aqui se quiser outro prompt fixo
 
 function normalizeToSlides(payload) {
   const raw = Array.isArray(payload)
@@ -36,6 +32,8 @@ function clampIndex(i, len) {
 }
 
 export default function App() {
+  const askUrl = import.meta.env.VITE_BFF_ASK_URL || DEFAULT_ASK_URL;
+
   const [loading, setLoading] = useState(false);
   const [rawResponse, setRawResponse] = useState(null);
 
@@ -50,20 +48,9 @@ export default function App() {
     setLoading(true);
 
     try {
-      if (!askUrl) {
-        setRawResponse(fallbackWords);
-        setActive(0);
-        return;
-      }
-
-      const headers = {
-        "Content-Type": "application/json",
-        ...(BFF_API_KEY ? { "x-api-key": BFF_API_KEY } : {}),
-      };
-
       const res = await fetch(askUrl, {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: DEFAULT_PROMPT }),
       });
 
@@ -75,15 +62,13 @@ export default function App() {
 
       const data = await res.json();
 
-      // ✅ AQUI é o ajuste: valida usando o normalizador
-      const normalized = normalizeToSlides(data);
-      if (normalized.length === 0) {
+      if (!Array.isArray(data) || data.length === 0) {
         setRawResponse(fallbackWords);
         setActive(0);
         return;
       }
 
-      setRawResponse(data); // mantém compatível com normalizeToSlides no useMemo
+      setRawResponse(data);
       setActive(0);
     } catch {
       setRawResponse(fallbackWords);
@@ -93,6 +78,7 @@ export default function App() {
     }
   }
 
+  // Busca automática ao abrir
   useEffect(() => {
     fetchSlides();
     // eslint-disable-next-line react-hooks/exhaustive-deps
