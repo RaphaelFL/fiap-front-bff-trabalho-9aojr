@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { fallbackWords } from "./fallbackWords";
 
-const DEFAULT_ASK_URL = "https://fiap-bff-trabalho-9aojr.onrender.com/ask";
-const DEFAULT_PROMPT = "arvore"; // mude aqui se quiser outro prompt fixo
+const DEFAULT_PROMPT = "arvore"; // prompt fixo
 
 function normalizeToSlides(payload) {
   const raw = Array.isArray(payload)
@@ -31,10 +30,28 @@ function clampIndex(i, len) {
   return ((i % len) + len) % len;
 }
 
-export default function App() {
-  const askUrl = import.meta.env.VITE_BFF_ASK_URL || DEFAULT_ASK_URL;
+/**
+ * Monta a URL final a partir do env.
+ * - Se VITE_BFF_ASK_URL vier vazio -> retorna "" (e cai em fallback).
+ * - Se vier só a base (sem /ask) -> anexa /ask.
+ * - Se vier com /ask -> usa como está.
+ */
+function buildAskUrlFromEnv() {
+  const envUrl = (import.meta.env.VITE_BFF_ASK_URL || "").trim();
+  if (!envUrl) return "";
 
-  // ✅ evita dupla chamada em DEV (React 18 StrictMode)
+  // Se o cara já apontou direto pra /ask, mantém
+  if (envUrl.endsWith("/ask")) return envUrl;
+
+  // Se apontou pra base, anexa /ask (sem duplicar barra)
+  return envUrl.endsWith("/") ? `${envUrl}ask` : `${envUrl}/ask`;
+}
+
+export default function App() {
+  const envAskUrl = (import.meta.env.VITE_BFF_ASK_URL || "").trim();
+  const askUrl = buildAskUrlFromEnv();
+
+  // ✅ evita duplicar em DEV com React 18 StrictMode
   const didFetchRef = useRef(false);
 
   const [loading, setLoading] = useState(false);
@@ -48,6 +65,13 @@ export default function App() {
   }, [slides.length]);
 
   async function fetchSlides() {
+    // Se não tem env, não tenta request
+    if (!askUrl) {
+      setRawResponse(fallbackWords);
+      setActive(0);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -58,6 +82,7 @@ export default function App() {
       });
 
       if (!res.ok) {
+        // 404/500/qualquer erro -> fallback
         setRawResponse(fallbackWords);
         setActive(0);
         return;
@@ -65,7 +90,10 @@ export default function App() {
 
       const data = await res.json();
 
-      if (!Array.isArray(data) || data.length === 0) {
+      // se backend devolver objeto, normalizeToSlides já tenta ler data/items/answer
+      // aqui só validamos que existe conteúdo
+      const normalized = normalizeToSlides(data);
+      if (!normalized.length) {
         setRawResponse(fallbackWords);
         setActive(0);
         return;
@@ -81,13 +109,13 @@ export default function App() {
     }
   }
 
-  // ✅ Busca automática ao abrir (1x) + log do env
+  // Busca automática ao abrir (1 vez)
   useEffect(() => {
     if (didFetchRef.current) return;
     didFetchRef.current = true;
 
-    // ✅ console pedido: valida se veio do Render (build-time)
-    console.log("VITE_BFF_ASK_URL:", import.meta.env.VITE_BFF_ASK_URL);
+    // ✅ console log como você pediu
+    console.log("VITE_BFF_ASK_URL (env):", envAskUrl);
     console.log("ASK_URL efetiva:", askUrl);
 
     fetchSlides();
