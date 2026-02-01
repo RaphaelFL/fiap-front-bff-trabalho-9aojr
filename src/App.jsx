@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { fallbackWords } from "./fallbackWords";
 
@@ -33,6 +33,9 @@ function clampIndex(i, len) {
 
 export default function App() {
   const askUrl = import.meta.env.VITE_BFF_ASK_URL || DEFAULT_ASK_URL;
+
+  // ✅ evita dupla chamada em DEV (React 18 StrictMode)
+  const didFetchRef = useRef(false);
 
   const [loading, setLoading] = useState(false);
   const [rawResponse, setRawResponse] = useState(null);
@@ -78,8 +81,15 @@ export default function App() {
     }
   }
 
-  // Busca automática ao abrir
+  // ✅ Busca automática ao abrir (1x) + log do env
   useEffect(() => {
+    if (didFetchRef.current) return;
+    didFetchRef.current = true;
+
+    // ✅ console pedido: valida se veio do Render (build-time)
+    console.log("VITE_BFF_ASK_URL:", import.meta.env.VITE_BFF_ASK_URL);
+    console.log("ASK_URL efetiva:", askUrl);
+
     fetchSlides();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
