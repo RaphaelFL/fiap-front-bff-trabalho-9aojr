@@ -3,7 +3,7 @@ import "./App.css";
 import { fallbackWords } from "./fallbackWords";
 
 // Tudo vem do .env (Vite)
-const askUrl = import.meta.env.VITE_BFF_ASK_URL;
+const askUrl = (import.meta.env.VITE_BFF_ASK_URL || "").trim();
 const DEFAULT_PROMPT = import.meta.env.VITE_BFF_DEFAULT_PROMPT || "arvore";
 
 // opcional: chave do BFF (NÃO é chave da OpenAI)
@@ -35,25 +35,6 @@ function clampIndex(i, len) {
   return ((i % len) + len) % len;
 }
 
-function buildCandidateUrls(baseUrl) {
-  const u = String(baseUrl || "").trim().replace(/\/+$/, "");
-  if (!u) return [];
-
-  const candidates = [u];
-
-  const endsWithAsk = /\/ask$/i.test(u);
-  if (!endsWithAsk) candidates.push(`${u}/ask`);
-  if (endsWithAsk) candidates.push(`${u}/ask`); // cobre /ask/ask
-
-  if (endsWithAsk) {
-    candidates.push(u.replace(/\/ask$/i, "/api/ask"));
-  } else {
-    candidates.push(`${u}/api/ask`);
-  }
-
-  return [...new Set(candidates)];
-}
-
 export default function App() {
   const [loading, setLoading] = useState(false);
   const [rawResponse, setRawResponse] = useState(null);
@@ -69,7 +50,6 @@ export default function App() {
     setLoading(true);
 
     try {
-      // se não tiver env, cai no fallback
       if (!askUrl) {
         setRawResponse(fallbackWords);
         setActive(0);
@@ -81,40 +61,31 @@ export default function App() {
         ...(BFF_API_KEY ? { "x-api-key": BFF_API_KEY } : {}),
       };
 
-      const candidates = buildCandidateUrls(askUrl);
-      let lastError = null;
+      const res = await fetch(askUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ question: DEFAULT_PROMPT }),
+      });
 
-      for (const url of candidates) {
-        try {
-          const res = await fetch(url, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ question: DEFAULT_PROMPT }),
-          });
-
-          if (res.status === 404) continue;
-          if (!res.ok) {
-            lastError = new Error(`HTTP ${res.status}`);
-            continue;
-          }
-
-          const data = await res.json();
-          const normalized = normalizeToSlides(data);
-
-          if (normalized.length === 0) {
-            lastError = new Error("Resposta vazia/fora do formato");
-            continue;
-          }
-
-          setRawResponse(data);
-          setActive(0);
-          return;
-        } catch (e) {
-          lastError = e;
-        }
+      if (!res.ok) {
+        setRawResponse(fallbackWords);
+        setActive(0);
+        return;
       }
 
-      console.error("Falha ao buscar no BFF:", lastError);
+      const data = await res.json();
+
+      // ✅ AQUI é o ajuste: valida usando o normalizador
+      const normalized = normalizeToSlides(data);
+      if (normalized.length === 0) {
+        setRawResponse(fallbackWords);
+        setActive(0);
+        return;
+      }
+
+      setRawResponse(data); // mantém compatível com normalizeToSlides no useMemo
+      setActive(0);
+    } catch {
       setRawResponse(fallbackWords);
       setActive(0);
     } finally {
