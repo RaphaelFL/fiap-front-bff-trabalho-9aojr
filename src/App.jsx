@@ -2,16 +2,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { fallbackWords } from "./fallbackWords";
 
-function extractRawArray(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.items)) return payload.items;
-  if (Array.isArray(payload?.answer)) return payload.answer;
-  return [];
-}
-
 function normalizeToSlides(payload) {
-  const raw = extractRawArray(payload);
+  const raw = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload?.answer)
+          ? payload.answer
+          : [];
+
   if (!Array.isArray(raw)) return [];
 
   return raw.map((item, i) => ({
@@ -42,34 +43,10 @@ function buildAskUrlsFromEnv() {
 
   const parts = [primary, alt]
     .filter(Boolean)
-    .join(",")
-    .split(/[,\s|;]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
     .map(normalizeAskUrl)
     .filter(Boolean);
 
   return Array.from(new Set(parts));
-}
-
-function dedupeByIdOrWord(items) {
-  const map = new Map();
-  for (const it of items) {
-    const key = it?.id ?? it?.word ?? JSON.stringify(it);
-    if (!map.has(key)) map.set(key, it);
-  }
-  return Array.from(map.values());
-}
-
-async function fetchSlidesFromUrl(url) {
-  const res = await fetch(url);
-  if (!res.ok) return null;
-
-  const data = await res.json();
-  const raw = extractRawArray(data);
-  if (!raw.length) return null;
-
-  return { url, raw };
 }
 
 export default function App() {
@@ -78,7 +55,7 @@ export default function App() {
 
   const [rawResponse, setRawResponse] = useState(fallbackWords);
   const [source, setSource] = useState("local");
-  const [apiUsed, setApiUsed] = useState([]);
+  const [apiUsed, setApiUsed] = useState("");
   const [loading, setLoading] = useState(true);
 
   const slides = useMemo(() => normalizeToSlides(rawResponse), [rawResponse]);
@@ -88,38 +65,54 @@ export default function App() {
     setActive((prev) => clampIndex(prev, slides.length));
   }, [slides.length]);
 
+  async function tryUrl(url) {
+    if (!url) return null;
+
+    const res = await fetch(url);
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const normalized = normalizeToSlides(data);
+    if (!normalized.length) return null;
+
+    return { url, data };
+  }
+
   async function fetchSlides() {
-    if (!askUrls.length) {
+    const primary = askUrls[0] || "";
+    const alt = askUrls[1] || "";
+
+    if (!primary && !alt) {
       setSource("local");
-      setApiUsed([]);
+      setApiUsed("");
       setLoading(false);
       return;
     }
 
     try {
-      const results = await Promise.allSettled(
-        askUrls.map((u) => fetchSlidesFromUrl(u))
-      );
-
-      const ok = results
-        .filter((r) => r.status === "fulfilled" && r.value)
-        .map((r) => r.value);
-
-      if (!ok.length) {
-        setSource("local");
-        setApiUsed([]);
+      const first = await tryUrl(primary);
+      if (first) {
+        setRawResponse(first.data);
+        setActive(0);
+        setSource("remote");
+        setApiUsed(first.url);
         return;
       }
 
-      const mergedRaw = dedupeByIdOrWord(ok.flatMap((x) => x.raw));
+      const second = await tryUrl(alt);
+      if (second) {
+        setRawResponse(second.data);
+        setActive(0);
+        setSource("remote");
+        setApiUsed(second.url);
+        return;
+      }
 
-      setRawResponse(mergedRaw);
-      setActive(0);
-      setSource("remote");
-      setApiUsed(ok.map((x) => x.url));
+      setSource("local");
+      setApiUsed("");
     } catch {
       setSource("local");
-      setApiUsed([]);
+      setApiUsed("");
     } finally {
       setLoading(false);
     }
@@ -147,10 +140,8 @@ export default function App() {
 
       <div style={{ marginTop: 8, marginBottom: 12, opacity: 0.9, fontSize: 14 }}>
         Fonte: <strong>{source === "remote" ? "API" : "Base local"}</strong>
-        {source === "remote" && apiUsed.length ? (
-          <span style={{ marginLeft: 8, opacity: 0.85 }}>
-            ({apiUsed.join(" | ")})
-          </span>
+        {source === "remote" && apiUsed ? (
+          <span style={{ marginLeft: 8, opacity: 0.85 }}>({apiUsed})</span>
         ) : null}
         {loading ? " (carregando...)" : ""}
       </div>
