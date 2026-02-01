@@ -1,16 +1,228 @@
-# React + Vite
+# FIAP Front + BFF — Vocabulary Carousel (React + Vite)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Este projeto é um front-end em **React + Vite** que exibe um **carrossel de vocabulário** (palavra + descrição + caso de uso).
 
-Currently, two official plugins are available:
+Ele funciona em dois modos:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+1. **Remoto (API/BFF)**: tenta buscar os dados em uma rota `/ask` (com fallback para uma segunda rota).
+2. **Local (fallback)**: se a API falhar ou estiver indisponível, usa uma base local `fallbackWords`.
 
-## React Compiler
+> Motivação do fallback: a rota/OpenAI do professor ficou sem saldo, então o app aceita **duas URLs** (sua e do professor) e tenta automaticamente uma depois da outra.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## Stack / Tecnologias
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **React 19** (UI)
+- **Vite 7** (build/dev server)
+- **ESLint 9** (lint)
+
+---
+
+## O que está instalado (package.json)
+
+### Dependencies
+- `react`
+- `react-dom`
+
+### Dev Dependencies
+- `vite`
+- `@vitejs/plugin-react`
+- `eslint`
+- `@eslint/js`
+- `eslint-plugin-react-hooks`
+- `eslint-plugin-react-refresh`
+- `@types/react`
+- `@types/react-dom`
+- `globals`
+
+Scripts disponíveis:
+- `npm run dev` — roda local (Vite)
+- `npm run build` — gera build de produção
+- `npm run preview` — serve build localmente (host 0.0.0.0, porta 4173)
+- `npm run start` — alias do preview (útil no Render)
+- `npm run lint` — roda eslint
+
+---
+
+## Estrutura principal do front
+
+### `App.jsx` (ou `App.tsx`)
+O app faz:
+- Lê variáveis de ambiente do Vite (Render também injeta isso).
+- Monta uma lista de URLs válidas para `/ask`.
+- Tenta buscar dados com `fetch(url)` em ordem:
+  1. `VITE_BFF_ASK_URL`
+  2. `VITE_BFF_ASK_URL_ALT`
+- Se nenhuma funcionar, usa `fallbackWords` (base local).
+
+### `fallbackWords`
+Arquivo local com uma lista de itens para o carrossel quando:
+- não há URL configurada, ou
+- a API está fora, ou
+- a resposta não vem no formato esperado.
+
+---
+
+## Como a busca remota funciona (duas rotas)
+
+O app monta as URLs assim:
+
+- `VITE_BFF_ASK_URL`  → normaliza para terminar em `/ask`
+- `VITE_BFF_ASK_URL_ALT` → normaliza para terminar em `/ask`
+
+Depois tenta:
+
+1) **URL primária**
+- Se `fetch` retornar **200** e o JSON tiver uma lista válida de itens, usa essa.
+
+2) **URL alternativa**
+- Se a primária falhar (status não-OK, erro, JSON inválido, ou lista vazia), tenta a alternativa.
+
+3) **Fallback local**
+- Se as duas falharem, cai no `fallbackWords`.
+
+Na UI aparece:
+- Fonte: **API** (remoto) ou **Base local**
+- E quando remoto: mostra qual URL foi usada
+
+---
+
+## Formato esperado da resposta da API
+
+O front tenta normalizar alguns formatos comuns:
+
+Ele aceita arrays em:
+- resposta como **array direto**: `[...]`
+- `data`: `{ "data": [...] }`
+- `items`: `{ "items": [...] }`
+- `answer`: `{ "answer": [...] }`
+
+Cada item é normalizado para:
+
+```json
+{
+  "word": "string",
+  "description": "string",
+  "useCase": "string"
+}
+```
+
+Se algum campo vier faltando:
+- `word` vira `"Item N"`
+- `description` e `useCase` viram `""` (na tela aparece `-`)
+
+---
+
+## Variáveis de ambiente (Vite)
+
+Crie um arquivo `.env` na raiz (local):
+
+```env
+VITE_BFF_ASK_URL=https://SUA-API-OU-SEU-BFF.onrender.com
+VITE_BFF_ASK_URL_ALT=https://API-DO-PROFESSOR.onrender.com
+```
+
+### Importante sobre URLs
+- Você pode colocar com ou sem `/ask`.
+- O app normaliza:
+  - remove barras finais
+  - remove querystring
+  - e garante que termina em `/ask`
+
+Exemplos equivalentes:
+- `https://api.exemplo.com` → vira `https://api.exemplo.com/ask`
+- `https://api.exemplo.com/ask` → mantém
+- `https://api.exemplo.com/ask?x=1` → vira `https://api.exemplo.com/ask`
+
+---
+
+## Configuração no Render (produção)
+
+### 1) Build & Start Commands
+No Render (Web Service / Static Site), use:
+
+- **Build Command**
+  ```bash
+  npm install && npm run build
+  ```
+
+> O script `start` já está configurado como:
+> `vite preview --host 0.0.0.0 --port 4173`
+
+### 2) Environment Variables (Render)
+No painel do Render, crie as variáveis:
+
+- `VITE_BFF_ASK_URL` = sua URL base do BFF (ou a rota do seu backend)
+- `VITE_BFF_ASK_URL_ALT` = URL base do professor (fallback)
+
+Exemplo:
+- `VITE_BFF_ASK_URL=https://meu-bff.onrender.com`
+- `VITE_BFF_ASK_URL_ALT=https://bff-professor.onrender.com`
+
+> O front vai chamar:
+> - `https://meu-bff.onrender.com/ask`
+> - se falhar, `https://bff-professor.onrender.com/ask`
+
+### 3) Observação sobre CORS
+Se o BFF estiver em outro domínio, ele precisa permitir CORS para o domínio do seu front.
+No backend, habilite CORS liberando o origin do seu site do Render.
+
+---
+
+## Rodando localmente
+
+1) Instalar dependências
+```bash
+npm install
+```
+
+2) Configurar `.env`
+```env
+VITE_BFF_ASK_URL=http://localhost:3000
+VITE_BFF_ASK_URL_ALT=https://bff-professor.onrender.com
+```
+
+3) Rodar
+```bash
+npm run dev
+```
+
+Acesse:
+- `http://localhost:5173`
+
+---
+
+## Comportamento do carrossel
+
+- Botões ◀ ▶:
+  - avançam/voltam e fazem “loop” (último → primeiro, primeiro → último)
+- Dots:
+  - clicáveis para ir direto em um item
+- Se não houver dados:
+  - mostra "Buscando dados..." enquanto carrega
+  - depois "Sem dados." se não tiver nada
+
+---
+
+## Troubleshooting rápido
+
+- **Sempre cai na Base local**
+  - Verifique se `VITE_BFF_ASK_URL` está configurado no Render.
+  - Teste no browser: abra `https://SEU-BFF/ask` e veja se retorna JSON com lista.
+  - Se retornar `{}` ou lista vazia, o front ignora e cai no fallback.
+
+- **Erro de CORS no console**
+  - Ajuste CORS no backend para permitir o domínio do seu front.
+
+- **URL duplicada / errada**
+  - Não coloque espaços e prefira a URL base; o app já completa `/ask`.
+
+---
+
+## Resumo do objetivo
+
+- Front simples em React para exibir “vocabulary slides”.
+- Integração com BFF via `/ask`.
+- **Failover automático** para uma segunda rota (professor) caso a primeira esteja indisponível ou sem saldo.
+- Fallback local garantido para nunca deixar a tela vazia.
