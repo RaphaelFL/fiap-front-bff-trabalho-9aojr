@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { fallbackWords } from "./fallbackWords";
 
-const DEFAULT_PROMPT = "arvore";
-
 function normalizeToSlides(payload) {
   const raw = Array.isArray(payload)
     ? payload
@@ -30,28 +28,29 @@ function clampIndex(i, len) {
   return ((i % len) + len) % len;
 }
 
-function buildAskUrlFromEnv(prompt) {
+/**
+ * Monta a URL final só com /ask (SEM querystring).
+ * - Se env vier vazio -> ""
+ * - Se já vier com /ask -> usa
+ * - Se vier base -> adiciona /ask
+ * - Se env vier com querystring, remove tudo após '?'
+ */
+function buildAskUrlFromEnv() {
   const envUrl = (import.meta.env.VITE_BFF_ASK_URL || "").trim();
   if (!envUrl) return "";
 
+  // remove querystring caso exista
+  const base = envUrl.split("?")[0];
 
-  if (envUrl.includes("?")) return envUrl;
-
-
-  const withAsk = envUrl.endsWith("/ask")
-    ? envUrl
-    : envUrl.endsWith("/")
-      ? `${envUrl}ask`
-      : `${envUrl}/ask`;
-
-  return `${withAsk}?question=${encodeURIComponent(prompt)}`;
+  if (base.endsWith("/ask")) return base;
+  return base.endsWith("/") ? `${base}ask` : `${base}/ask`;
 }
 
 export default function App() {
   const didFetchRef = useRef(false);
 
   const envAskUrl = (import.meta.env.VITE_BFF_ASK_URL || "").trim();
-  const askUrl = buildAskUrlFromEnv(DEFAULT_PROMPT);
+  const askUrl = buildAskUrlFromEnv();
 
   const [loading, setLoading] = useState(false);
   const [rawResponse, setRawResponse] = useState(null);
@@ -73,7 +72,7 @@ export default function App() {
     setLoading(true);
 
     try {
-
+      // ✅ GET puro no /ask
       const res = await fetch(askUrl);
 
       if (!res.ok) {
@@ -106,10 +105,10 @@ export default function App() {
     didFetchRef.current = true;
 
     console.log("VITE_BFF_ASK_URL (env):", envAskUrl);
-    console.log("ASK_URL efetiva (GET):", askUrl);
+    console.log("ASK_URL efetiva (GET /ask):", askUrl);
 
     fetchSlides();
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function next() {
