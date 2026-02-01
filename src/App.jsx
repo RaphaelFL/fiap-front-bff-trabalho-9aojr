@@ -28,30 +28,38 @@ function clampIndex(i, len) {
   return ((i % len) + len) % len;
 }
 
-/**
- * Monta URL final: sempre termina em /ask e remove querystring.
- */
-function buildAskUrlFromEnv() {
-  const envUrl = (import.meta.env.VITE_BFF_ASK_URL || "").trim();
-  if (!envUrl) return "";
+function normalizeAskUrl(url) {
+  const trimmed = (url || "").trim();
+  if (!trimmed) return "";
 
-  const base = envUrl.split("?")[0];
-
+  const base = trimmed.split("?")[0].replace(/\/+$/, "");
   if (base.endsWith("/ask")) return base;
-  return base.endsWith("/") ? `${base}ask` : `${base}/ask`;
+  return `${base}/ask`;
+}
+
+function buildAskUrlsFromEnv() {
+  const primary = (import.meta.env.VITE_BFF_ASK_URL || "").trim();
+  const alt = (import.meta.env.VITE_BFF_ASK_URL_ALT || "").trim();
+
+  const parts = [primary, alt]
+    .filter(Boolean)
+    .join(",")
+    .split(/[,\s|;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(normalizeAskUrl)
+    .filter(Boolean);
+
+  return Array.from(new Set(parts));
 }
 
 export default function App() {
   const didFetchRef = useRef(false);
-  const askUrl = buildAskUrlFromEnv();
+  const askUrls = buildAskUrlsFromEnv();
 
-  // ✅ sempre tem dado pra exibir (base local)
   const [rawResponse, setRawResponse] = useState(fallbackWords);
-
-  // ✅ indicador de origem do dado (o que você pediu pra exibir)
-  // "local" = fallbackWords, "remote" = API
   const [source, setSource] = useState("local");
-
+  const [apiUsed, setApiUsed] = useState("");
   const [loading, setLoading] = useState(true);
 
   const slides = useMemo(() => normalizeToSlides(rawResponse), [rawResponse]);
@@ -61,38 +69,43 @@ export default function App() {
     setActive((prev) => clampIndex(prev, slides.length));
   }, [slides.length]);
 
+  async function tryFetchFrom(url) {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const normalized = normalizeToSlides(data);
+
+    if (!normalized.length) return null;
+    return data;
+  }
+
   async function fetchSlides() {
-    // sem env -> fica no local
-    if (!askUrl) {
+    if (!askUrls.length) {
       setSource("local");
+      setApiUsed("");
       setLoading(false);
       return;
     }
 
     try {
-      const res = await fetch(askUrl); // ✅ GET puro
+      for (const url of askUrls) {
+        try {
+          const data = await tryFetchFrom(url);
+          if (!data) continue;
 
-      // qualquer erro HTTP -> mantém local
-      if (!res.ok) {
-        setSource("local");
-        return;
+          setRawResponse(data);
+          setActive(0);
+          setSource("remote");
+          setApiUsed(url);
+          return;
+        } catch {
+          // noop
+        }
       }
 
-      const data = await res.json();
-
-      const normalized = normalizeToSlides(data);
-      if (!normalized.length) {
-        setSource("local");
-        return;
-      }
-
-      // ✅ sucesso -> troca pra remoto e marca origem
-      setRawResponse(data);
-      setActive(0);
-      setSource("remote");
-    } catch {
-      // rede/CORS/timeout/JSON inválido -> mantém local
       setSource("local");
+      setApiUsed("");
     } finally {
       setLoading(false);
     }
@@ -101,9 +114,7 @@ export default function App() {
   useEffect(() => {
     if (didFetchRef.current) return;
     didFetchRef.current = true;
-
     fetchSlides();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function next() {
@@ -120,12 +131,11 @@ export default function App() {
     <div className="app">
       <h1>Vocabulary Carousel</h1>
 
-      {/* ✅ AQUI é o que você pediu: mostrar se é base local ou API */}
       <div style={{ marginTop: 8, marginBottom: 12, opacity: 0.9, fontSize: 14 }}>
-        Fonte:{" "}
-        <strong>
-          {source === "remote" ? "API" : "Base local"}
-        </strong>
+        Fonte: <strong>{source === "remote" ? "API" : "Base local"}</strong>
+        {source === "remote" && apiUsed ? (
+          <span style={{ marginLeft: 8, opacity: 0.85 }}>({apiUsed})</span>
+        ) : null}
         {loading ? " (carregando...)" : ""}
       </div>
 
