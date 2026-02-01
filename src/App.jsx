@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { fallbackWords } from "./fallbackWords";
 
-const DEFAULT_ASK_URL = "https://fiap-bff-trabalho-9aojr.onrender.com/ask";
+// Tudo vem do .env (Vite)
+const askUrl = import.meta.env.VITE_BFF_ASK_URL;
+const DEFAULT_PROMPT = import.meta.env.VITE_BFF_DEFAULT_PROMPT || "arvore";
+
+// opcional: chave do BFF (NÃO é chave da OpenAI)
+const BFF_API_KEY = import.meta.env.VITE_BFF_API_KEY || "";
 
 function normalizeToSlides(payload) {
   const raw = Array.isArray(payload)
@@ -30,12 +35,26 @@ function clampIndex(i, len) {
   return ((i % len) + len) % len;
 }
 
-export default function App() {
-  // Tudo vem do .env (Vite). Se não tiver, usa DEFAULT_ASK_URL.
-  const askUrl = import.meta.env.VITE_BFF_ASK_URL || DEFAULT_ASK_URL;
-  const DEFAULT_PROMPT = import.meta.env.VITE_BFF_DEFAULT_PROMPT || "arvore";
-  const BFF_API_KEY = import.meta.env.VITE_BFF_API_KEY || "";
+function buildCandidateUrls(baseUrl) {
+  const u = String(baseUrl || "").trim().replace(/\/+$/, "");
+  if (!u) return [];
 
+  const candidates = [u];
+
+  const endsWithAsk = /\/ask$/i.test(u);
+  if (!endsWithAsk) candidates.push(`${u}/ask`);
+  if (endsWithAsk) candidates.push(`${u}/ask`); // cobre /ask/ask
+
+  if (endsWithAsk) {
+    candidates.push(u.replace(/\/ask$/i, "/api/ask"));
+  } else {
+    candidates.push(`${u}/api/ask`);
+  }
+
+  return [...new Set(candidates)];
+}
+
+export default function App() {
   const [loading, setLoading] = useState(false);
   const [rawResponse, setRawResponse] = useState(null);
 
@@ -50,36 +69,52 @@ export default function App() {
     setLoading(true);
 
     try {
+      // se não tiver env, cai no fallback
+      if (!askUrl) {
+        setRawResponse(fallbackWords);
+        setActive(0);
+        return;
+      }
+
       const headers = {
         "Content-Type": "application/json",
         ...(BFF_API_KEY ? { "x-api-key": BFF_API_KEY } : {}),
-        // Se seu BFF preferir Bearer:
-        // ...(BFF_API_KEY ? { Authorization: `Bearer ${BFF_API_KEY}` } : {}),
       };
 
-      const res = await fetch(askUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ question: DEFAULT_PROMPT }),
-      });
+      const candidates = buildCandidateUrls(askUrl);
+      let lastError = null;
 
-      if (!res.ok) {
-        setRawResponse(fallbackWords);
-        setActive(0);
-        return;
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ question: DEFAULT_PROMPT }),
+          });
+
+          if (res.status === 404) continue;
+          if (!res.ok) {
+            lastError = new Error(`HTTP ${res.status}`);
+            continue;
+          }
+
+          const data = await res.json();
+          const normalized = normalizeToSlides(data);
+
+          if (normalized.length === 0) {
+            lastError = new Error("Resposta vazia/fora do formato");
+            continue;
+          }
+
+          setRawResponse(data);
+          setActive(0);
+          return;
+        } catch (e) {
+          lastError = e;
+        }
       }
 
-      const data = await res.json();
-
-      if (!Array.isArray(data) || data.length === 0) {
-        setRawResponse(fallbackWords);
-        setActive(0);
-        return;
-      }
-
-      setRawResponse(data);
-      setActive(0);
-    } catch {
+      console.error("Falha ao buscar no BFF:", lastError);
       setRawResponse(fallbackWords);
       setActive(0);
     } finally {
