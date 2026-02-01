@@ -2,12 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { fallbackWords } from "./fallbackWords";
 
-// Tudo vem do .env (Vite)
-const askUrl = import.meta.env.VITE_BFF_ASK_URL;
-const DEFAULT_PROMPT = import.meta.env.VITE_BFF_DEFAULT_PROMPT || "arvore";
-
-// opcional: chave do BFF (NÃO é chave da OpenAI)
-const BFF_API_KEY = import.meta.env.VITE_BFF_API_KEY || "";
+const DEFAULT_ASK_URL = "https://fiap-bff-trabalho-9aojr.onrender.com/ask";
 
 function normalizeToSlides(payload) {
   const raw = Array.isArray(payload)
@@ -36,6 +31,11 @@ function clampIndex(i, len) {
 }
 
 export default function App() {
+  // Tudo vem do .env (Vite). Se não tiver, usa DEFAULT_ASK_URL.
+  const askUrl = import.meta.env.VITE_BFF_ASK_URL || DEFAULT_ASK_URL;
+  const DEFAULT_PROMPT = import.meta.env.VITE_BFF_DEFAULT_PROMPT || "arvore";
+  const BFF_API_KEY = import.meta.env.VITE_BFF_API_KEY || "";
+
   const [loading, setLoading] = useState(false);
   const [rawResponse, setRawResponse] = useState(null);
 
@@ -50,16 +50,9 @@ export default function App() {
     setLoading(true);
 
     try {
-      // Se o .env não tiver a URL do BFF, cai direto no fallback (sem UI extra)
-      if (!askUrl) {
-        setRawResponse(fallbackWords);
-        setActive(0);
-        return;
-      }
-
       const headers = {
         "Content-Type": "application/json",
-        ...(BFF_API_KEY ? { "x-api-key": BFF_API_KEY } : {}), // opcional
+        ...(BFF_API_KEY ? { "x-api-key": BFF_API_KEY } : {}),
         // Se seu BFF preferir Bearer:
         // ...(BFF_API_KEY ? { Authorization: `Bearer ${BFF_API_KEY}` } : {}),
       };
