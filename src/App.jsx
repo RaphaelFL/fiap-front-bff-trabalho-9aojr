@@ -29,17 +29,12 @@ function clampIndex(i, len) {
 }
 
 /**
- * Monta a URL final só com /ask (SEM querystring).
- * - Se env vier vazio -> ""
- * - Se já vier com /ask -> usa
- * - Se vier base -> adiciona /ask
- * - Se env vier com querystring, remove tudo após '?'
+ * Monta URL final: sempre termina em /ask e remove querystring.
  */
 function buildAskUrlFromEnv() {
   const envUrl = (import.meta.env.VITE_BFF_ASK_URL || "").trim();
   if (!envUrl) return "";
 
-  // remove querystring caso exista
   const base = envUrl.split("?")[0];
 
   if (base.endsWith("/ask")) return base;
@@ -48,12 +43,16 @@ function buildAskUrlFromEnv() {
 
 export default function App() {
   const didFetchRef = useRef(false);
-
-  const envAskUrl = (import.meta.env.VITE_BFF_ASK_URL || "").trim();
   const askUrl = buildAskUrlFromEnv();
 
-  const [loading, setLoading] = useState(false);
-  const [rawResponse, setRawResponse] = useState(null);
+  // ✅ sempre tem dado pra exibir (base local)
+  const [rawResponse, setRawResponse] = useState(fallbackWords);
+
+  // ✅ indicador de origem do dado (o que você pediu pra exibir)
+  // "local" = fallbackWords, "remote" = API
+  const [source, setSource] = useState("local");
+
+  const [loading, setLoading] = useState(true);
 
   const slides = useMemo(() => normalizeToSlides(rawResponse), [rawResponse]);
   const [active, setActive] = useState(0);
@@ -63,21 +62,19 @@ export default function App() {
   }, [slides.length]);
 
   async function fetchSlides() {
+    // sem env -> fica no local
     if (!askUrl) {
-      setRawResponse(fallbackWords);
-      setActive(0);
+      setSource("local");
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-
     try {
-      // ✅ GET puro no /ask
-      const res = await fetch(askUrl);
+      const res = await fetch(askUrl); // ✅ GET puro
 
+      // qualquer erro HTTP -> mantém local
       if (!res.ok) {
-        setRawResponse(fallbackWords);
-        setActive(0);
+        setSource("local");
         return;
       }
 
@@ -85,16 +82,17 @@ export default function App() {
 
       const normalized = normalizeToSlides(data);
       if (!normalized.length) {
-        setRawResponse(fallbackWords);
-        setActive(0);
+        setSource("local");
         return;
       }
 
+      // ✅ sucesso -> troca pra remoto e marca origem
       setRawResponse(data);
       setActive(0);
+      setSource("remote");
     } catch {
-      setRawResponse(fallbackWords);
-      setActive(0);
+      // rede/CORS/timeout/JSON inválido -> mantém local
+      setSource("local");
     } finally {
       setLoading(false);
     }
@@ -103,9 +101,6 @@ export default function App() {
   useEffect(() => {
     if (didFetchRef.current) return;
     didFetchRef.current = true;
-
-    console.log("VITE_BFF_ASK_URL (env):", envAskUrl);
-    console.log("ASK_URL efetiva (GET /ask):", askUrl);
 
     fetchSlides();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,6 +120,15 @@ export default function App() {
     <div className="app">
       <h1>Vocabulary Carousel</h1>
 
+      {/* ✅ AQUI é o que você pediu: mostrar se é base local ou API */}
+      <div style={{ marginTop: 8, marginBottom: 12, opacity: 0.9, fontSize: 14 }}>
+        Fonte:{" "}
+        <strong>
+          {source === "remote" ? "API" : "Base local"}
+        </strong>
+        {loading ? " (carregando...)" : ""}
+      </div>
+
       <div className="carousel">
         <div className="carouselHeader">
           <button className="btn" onClick={prev} disabled={slides.length <= 1}>
@@ -142,9 +146,7 @@ export default function App() {
 
         <div className="slide">
           {!current ? (
-            <div className="empty">
-              {loading ? "Buscando dados..." : "Sem dados."}
-            </div>
+            <div className="empty">{loading ? "Buscando dados..." : "Sem dados."}</div>
           ) : (
             <>
               <h2 className="title">{current.word}</h2>
