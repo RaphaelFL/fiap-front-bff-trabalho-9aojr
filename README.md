@@ -237,12 +237,7 @@ Este repositório inclui evidências de performance geradas pelo **Lighthouse / 
 
 > Coloque os arquivos dentro da pasta `docs/` do projeto.
 
-- Print da análise (Desktop): `docs/lighthouse-desktop.png`
-- PDF com a análise completa: `docs/lighthouse-web-vitals.pdf`
-
-### Preview (Desktop)
-
-![Lighthouse - Web Vitals (Desktop)](./docs/lighthouse-desktop.png)
+![Lighthouse - Web Vitals (Desktop)](./docs/light1.png)
 
 ---
 
@@ -289,5 +284,5 @@ Para manter rastreabilidade, recomenda-se versionar sempre o **print** e o **PDF
    - um **print** da tela com os resultados
    - e um **PDF** do relatório (quando disponível)
 3. Salve/atualize em:
-   - `docs/lighthouse-desktop.png`
+  - `docs/light1.png`
 4. Faça commit das evidências junto das mudanças que impactaram performance.
