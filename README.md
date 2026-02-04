@@ -226,3 +226,68 @@ Acesse:
 - Integração com BFF via `/ask`.
 - **Failover automático** para uma segunda rota (professor) caso a primeira esteja indisponível ou sem saldo.
 - Fallback local garantido para nunca deixar a tela vazia.
+
+# Lighthouse / Web Vitals (PageSpeed Insights)
+
+Este repositório inclui evidências de performance geradas pelo **Lighthouse / PageSpeed Insights**, contendo as principais métricas de **Core Web Vitals** e métricas complementares de carregamento/estabilidade.
+
+---
+
+## Evidências
+
+> Coloque os arquivos dentro da pasta `docs/` do projeto.
+
+- Print da análise (Desktop): `docs/lighthouse-desktop.png`
+- PDF com a análise completa: `docs/lighthouse-web-vitals.pdf`
+
+### Preview (Desktop)
+
+![Lighthouse - Web Vitals (Desktop)](./docs/lighthouse-desktop.png)
+
+---
+
+## Métricas aferidas e significado
+
+As métricas abaixo ajudam a medir **velocidade percebida**, **responsividade** e **estabilidade visual** da página.
+
+### FCP — First Contentful Paint
+Tempo até o navegador renderizar o **primeiro conteúdo visível** (texto, imagem, SVG, etc.).  
+- **Interpretação:** quão rápido o usuário vê “algo” na tela.
+- **Quanto menor, melhor.**
+
+### LCP — Largest Contentful Paint
+Tempo até renderizar o **maior elemento visível** na viewport (geralmente o conteúdo principal).  
+- **Interpretação:** quão rápido a parte principal “parece carregada”.
+- **Quanto menor, melhor.**
+
+### TBT — Total Blocking Time
+Soma do tempo em que a **main thread** ficou bloqueada por tarefas longas (geralmente JavaScript), impedindo interações.  
+- **Interpretação:** se a página fica “travada” enquanto carrega.
+- **Quanto menor, melhor (ideal: próximo de 0ms).**
+
+### CLS — Cumulative Layout Shift
+Mede o quanto a página sofre **mudanças inesperadas de layout** (elementos “pulando” na tela).  
+- **Interpretação:** estabilidade visual durante o carregamento.
+- **Quanto menor, melhor (ideal: 0).**
+
+### Speed Index
+Estimativa de quão rápido o conteúdo visível é **pintado progressivamente** na tela.  
+- **Interpretação:** sensação geral de velocidade de renderização.
+- **Quanto menor, melhor.**
+
+---
+
+## Observação
+A análise apresentada foi executada no modo **Desktop** (conforme evidências acima).  
+Para manter rastreabilidade, recomenda-se versionar sempre o **print** e o **PDF** do relatório junto ao código.
+
+---
+
+## Como atualizar a evidência
+1. Rode a análise no Lighthouse / PageSpeed Insights (Desktop ou Mobile).
+2. Exporte ou capture:
+   - um **print** da tela com os resultados
+   - e um **PDF** do relatório (quando disponível)
+3. Salve/atualize em:
+   - `docs/lighthouse-desktop.png`
+4. Faça commit das evidências junto das mudanças que impactaram performance.
